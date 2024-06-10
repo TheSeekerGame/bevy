@@ -4,9 +4,10 @@ use bevy_render::{
     camera::ExtractedCamera,
     render_graph::{Node, NodeRunError, RenderGraphContext},
     render_phase::RenderPhase,
-    render_resource::RenderPassDescriptor,
+    render_resource::{RenderPassDescriptor, StoreOp},
     renderer::RenderContext,
     view::{ExtractedView, ViewTarget},
+    view::{ViewDepthTexture},
 };
 #[cfg(feature = "trace")]
 use bevy_utils::tracing::info_span;
@@ -17,6 +18,7 @@ pub struct MainPass2dNode {
             &'static ExtractedCamera,
             &'static RenderPhase<Transparent2d>,
             &'static ViewTarget,
+            &'static ViewDepthTexture,
         ),
         With<ExtractedView>,
     >,
@@ -42,7 +44,7 @@ impl Node for MainPass2dNode {
         world: &World,
     ) -> Result<(), NodeRunError> {
         let view_entity = graph.view_entity();
-        let Ok((camera, transparent_phase, target)) = self.query.get_manual(world, view_entity)
+        let Ok((camera, transparent_phase, target, depth)) = self.query.get_manual(world, view_entity)
         else {
             // no target
             return Ok(());
@@ -55,7 +57,13 @@ impl Node for MainPass2dNode {
             let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
                 label: Some("main_pass_2d"),
                 color_attachments: &[Some(target.get_color_attachment())],
-                depth_stencil_attachment: None,
+                // NOTE: For the transparent pass we load the depth buffer. There should be no
+                // need to write to it, but store is set to `true` as a workaround for issue #3776,
+                // https://github.com/bevyengine/bevy/issues/3776
+                // so that wgpu does not clear the depth buffer.
+                // As the opaque and alpha mask passes run first, opaque meshes can occlude
+                // transparent ones.
+                depth_stencil_attachment: Some(depth.get_attachment(StoreOp::Store)),
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });

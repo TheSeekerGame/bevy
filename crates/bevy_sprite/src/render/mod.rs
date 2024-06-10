@@ -7,7 +7,9 @@ use crate::{
 use bevy_asset::{AssetEvent, AssetId, Assets, Handle};
 use bevy_core_pipeline::{
     core_2d::Transparent2d,
-    tonemapping::{DebandDither, Tonemapping},
+    tonemapping::{
+        DebandDither, Tonemapping,
+    },
 };
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::{
@@ -40,6 +42,7 @@ use bevy_transform::components::GlobalTransform;
 use bevy_utils::{FloatOrd, HashMap};
 use bytemuck::{Pod, Zeroable};
 use fixedbitset::FixedBitSet;
+use bevy_core_pipeline::core_2d::CORE_2D_DEPTH_FORMAT;
 
 #[derive(Resource)]
 pub struct SpritePipeline {
@@ -281,7 +284,22 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 topology: PrimitiveTopology::TriangleList,
                 strip_index_format: None,
             },
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: CORE_2D_DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::GreaterEqual,
+                stencil: StencilState {
+                    front: StencilFaceState::IGNORE,
+                    back: StencilFaceState::IGNORE,
+                    read_mask: 0,
+                    write_mask: 0,
+                },
+                bias: DepthBiasState {
+                    constant: 0,
+                    slope_scale: 0.0,
+                    clamp: 0.0,
+                },
+            }),
             multisample: MultisampleState {
                 count: key.msaa_samples(),
                 mask: !0,

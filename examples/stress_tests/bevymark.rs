@@ -12,7 +12,7 @@ use bevy::{
         render_asset::RenderAssetUsages,
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
-    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
+    sprite::{AlphaMode2d, MaterialMesh2dBundle, Mesh2dHandle},
     utils::Duration,
     window::{PresentMode, WindowResolution},
     winit::{UpdateMode, WinitSettings},
@@ -573,6 +573,7 @@ fn init_materials(
     materials.push(assets.add(ColorMaterial {
         color: Color::WHITE,
         texture: textures.first().cloned(),
+        alpha_mode: AlphaMode2d::Blend,
     }));
 
     let mut color_rng = StdRng::seed_from_u64(42);
@@ -582,6 +583,7 @@ fn init_materials(
             assets.add(ColorMaterial {
                 color: Color::rgb_u8(color_rng.gen(), color_rng.gen(), color_rng.gen()),
                 texture: textures.choose(&mut texture_rng).cloned(),
+                alpha_mode: AlphaMode2d::Blend,
             })
         })
         .take(capacity - materials.len()),

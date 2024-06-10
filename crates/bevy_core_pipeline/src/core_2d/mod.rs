@@ -39,14 +39,24 @@ use bevy_render::{
         sort_phase_system, CachedRenderPipelinePhaseItem, DrawFunctionId, DrawFunctions, PhaseItem,
         RenderPhase,
     },
-    render_resource::CachedRenderPipelineId,
+    render_resource::{
+        CachedRenderPipelineId, Extent3d, TextureDescriptor, TextureDimension, TextureFormat,
+        TextureUsages,
+    },
+    renderer::RenderDevice,
+    texture::TextureCache,
+    view::{Msaa, ViewDepthTexture},
     Extract, ExtractSchedule, Render, RenderApp, RenderSet,
 };
-use bevy_utils::{nonmax::NonMaxU32, FloatOrd};
+use bevy_render::camera::ExtractedCamera;
+use bevy_render::render_resource::TextureFormat;
+use bevy_utils::{nonmax::NonMaxU32, FloatOrd, HashMap};
 
 use crate::{tonemapping::TonemappingNode, upscaling::UpscalingNode};
 
 use self::graph::{Core2d, Node2d};
+
+pub const CORE_2D_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
 pub struct Core2dPlugin;
 
@@ -64,7 +74,10 @@ impl Plugin for Core2dPlugin {
             .add_systems(ExtractSchedule, extract_core_2d_camera_phases)
             .add_systems(
                 Render,
-                sort_phase_system::<Transparent2d>.in_set(RenderSet::PhaseSort),
+                (
+                    sort_phase_system::<Transparent2d>.in_set(RenderSet::PhaseSort),
+                    prepare_core_2d_depth_textures.in_set(RenderSet::PrepareResources),
+                )
             );
 
         render_app
@@ -156,5 +169,50 @@ pub fn extract_core_2d_camera_phases(
                 .get_or_spawn(entity)
                 .insert(RenderPhase::<Transparent2d>::default());
         }
+    }
+}
+
+pub fn prepare_core_2d_depth_textures(
+    mut commands: Commands,
+    mut texture_cache: ResMut<TextureCache>,
+    msaa: Res<Msaa>,
+    render_device: Res<RenderDevice>,
+    views_2d: Query<(Entity, &ExtractedCamera), (With<Camera2d>,)>,
+) {
+    let mut textures = HashMap::default();
+    for (entity, camera) in &views_2d {
+
+        let Some(physical_target_size) = camera.physical_target_size else {
+            continue;
+        };
+
+        let cached_texture = textures
+            .entry(camera.target.clone())
+            .or_insert_with(|| {
+                // The size of the depth texture
+                let size = Extent3d {
+                    depth_or_array_layers: 1,
+                    width: physical_target_size.x,
+                    height: physical_target_size.y,
+                };
+
+                let descriptor = TextureDescriptor {
+                    label: Some("view_depth_texture"),
+                    size,
+                    mip_level_count: 1,
+                    sample_count: msaa.samples(),
+                    dimension: TextureDimension::D2,
+                    format: CORE_2D_DEPTH_FORMAT,
+                    usage: TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[],
+                };
+
+                texture_cache.get(&render_device, descriptor)
+            })
+            .clone();
+
+        commands
+            .entity(entity)
+            .insert(ViewDepthTexture::new(cached_texture, Some(0.0)));
     }
 }
