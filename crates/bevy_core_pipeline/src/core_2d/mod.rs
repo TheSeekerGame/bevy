@@ -202,7 +202,7 @@ pub fn prepare_core_2d_depth_textures(
                     sample_count: msaa.samples(),
                     dimension: TextureDimension::D2,
                     format: CORE_2D_DEPTH_FORMAT,
-                    usage: TextureUsages::RENDER_ATTACHMENT,
+                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
                     view_formats: &[],
                 };
 
