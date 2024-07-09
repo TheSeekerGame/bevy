@@ -49,7 +49,6 @@ use bevy_render::{
     Extract, ExtractSchedule, Render, RenderApp, RenderSet,
 };
 use bevy_render::camera::ExtractedCamera;
-use bevy_render::render_resource::TextureFormat;
 use bevy_utils::{nonmax::NonMaxU32, FloatOrd, HashMap};
 
 use crate::{tonemapping::TonemappingNode, upscaling::UpscalingNode};
