@@ -34,6 +34,7 @@ pub use texture_slice::*;
 use bevy_app::prelude::*;
 use bevy_asset::{load_internal_asset, AssetApp, Assets, Handle};
 use bevy_core_pipeline::core_2d::Transparent2d;
+use bevy_core_pipeline::core_3d::Transparent3d;
 use bevy_ecs::prelude::*;
 use bevy_render::{
     mesh::Mesh,
@@ -94,7 +95,7 @@ impl Plugin for SpritePlugin {
                 .init_resource::<SpriteMeta>()
                 .init_resource::<ExtractedSprites>()
                 .init_resource::<SpriteAssetEvents>()
-                .add_render_command::<Transparent2d, DrawSprite>()
+                .add_render_command::<Transparent3d, DrawSprite>()
                 .add_systems(
                     ExtractSchedule,
                     (

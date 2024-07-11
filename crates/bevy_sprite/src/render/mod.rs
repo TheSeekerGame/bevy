@@ -40,6 +40,7 @@ use bevy_transform::components::GlobalTransform;
 use bevy_utils::{FloatOrd, HashMap};
 use bytemuck::{Pod, Zeroable};
 use fixedbitset::FixedBitSet;
+use bevy_core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Transparent3d};
 
 #[derive(Resource)]
 pub struct SpritePipeline {
@@ -281,7 +282,22 @@ impl SpecializedRenderPipeline for SpritePipeline {
                 topology: PrimitiveTopology::TriangleList,
                 strip_index_format: None,
             },
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: CORE_3D_DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::GreaterEqual,
+                stencil: StencilState {
+                    front: StencilFaceState::IGNORE,
+                    back: StencilFaceState::IGNORE,
+                    read_mask: 0,
+                    write_mask: 0,
+                },
+                bias: DepthBiasState {
+                    constant: 0,
+                    slope_scale: 0.0,
+                    clamp: 0.0,
+                },
+            }),
             multisample: MultisampleState {
                 count: key.msaa_samples(),
                 mask: !0,
@@ -451,14 +467,14 @@ pub struct ImageBindGroups {
 #[allow(clippy::too_many_arguments)]
 pub fn queue_sprites(
     mut view_entities: Local<FixedBitSet>,
-    draw_functions: Res<DrawFunctions<Transparent2d>>,
+    draw_functions: Res<DrawFunctions<Transparent3d>>,
     sprite_pipeline: Res<SpritePipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<SpritePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     msaa: Res<Msaa>,
     extracted_sprites: Res<ExtractedSprites>,
     mut views: Query<(
-        &mut RenderPhase<Transparent2d>,
+        &mut RenderPhase<Transparent3d>,
         &VisibleEntities,
         &ExtractedView,
         Option<&Tonemapping>,
@@ -521,25 +537,26 @@ pub fn queue_sprites(
             }
 
             // These items will be sorted by depth with other phase items
-            let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
+            let distance = extracted_sprite.transform.translation().z;
 
             // Add the item to the render phase
             if extracted_sprite.color != Color::WHITE {
-                transparent_phase.add(Transparent2d {
+                transparent_phase.add(Transparent3d {
+                    distance,
                     draw_function: draw_sprite_function,
                     pipeline: colored_pipeline,
                     entity: *entity,
-                    sort_key,
+
                     // batch_range and dynamic_offset will be calculated in prepare_sprites
                     batch_range: 0..0,
                     dynamic_offset: None,
                 });
             } else {
-                transparent_phase.add(Transparent2d {
+                transparent_phase.add(Transparent3d {
+                    distance,
                     draw_function: draw_sprite_function,
                     pipeline,
                     entity: *entity,
-                    sort_key,
                     // batch_range and dynamic_offset will be calculated in prepare_sprites
                     batch_range: 0..0,
                     dynamic_offset: None,
@@ -561,7 +578,7 @@ pub fn prepare_sprites(
     mut image_bind_groups: ResMut<ImageBindGroups>,
     gpu_images: Res<RenderAssets<Image>>,
     extracted_sprites: Res<ExtractedSprites>,
-    mut phases: Query<&mut RenderPhase<Transparent2d>>,
+    mut phases: Query<&mut RenderPhase<Transparent3d>>,
     events: Res<SpriteAssetEvents>,
 ) {
     // If an image has changed, the GpuImage has (probably) changed
