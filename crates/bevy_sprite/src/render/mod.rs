@@ -7,7 +7,7 @@ use crate::{
 use bevy_asset::{AssetEvent, AssetId, Assets};
 use bevy_color::{ColorToComponents, LinearRgba};
 use bevy_core_pipeline::{
-    core_2d::{Transparent2d, CORE_2D_DEPTH_FORMAT},
+    core_3d::{Transparent3d, CORE_3D_DEPTH_FORMAT},
     tonemapping::{
         get_lut_bind_group_layout_entries, get_lut_bindings, DebandDither, Tonemapping,
         TonemappingLuts,
@@ -299,8 +299,8 @@ impl SpecializedRenderPipeline for SpritePipeline {
             // They just need to read it in case an opaque mesh2d
             // that wrote to depth is present.
             depth_stencil: Some(DepthStencilState {
-                format: CORE_2D_DEPTH_FORMAT,
-                depth_write_enabled: false,
+                format: CORE_3D_DEPTH_FORMAT,
+                depth_write_enabled: true,
                 depth_compare: CompareFunction::GreaterEqual,
                 stencil: StencilState {
                     front: StencilFaceState::IGNORE,
@@ -498,12 +498,12 @@ pub struct ImageBindGroups {
 #[allow(clippy::too_many_arguments)]
 pub fn queue_sprites(
     mut view_entities: Local<FixedBitSet>,
-    draw_functions: Res<DrawFunctions<Transparent2d>>,
+    draw_functions: Res<DrawFunctions<Transparent3d>>,
     sprite_pipeline: Res<SpritePipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<SpritePipeline>>,
     pipeline_cache: Res<PipelineCache>,
     extracted_sprites: Res<ExtractedSprites>,
-    mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent2d>>,
+    mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
     mut views: Query<(
         Entity,
         &RenderVisibleEntities,
@@ -567,14 +567,14 @@ pub fn queue_sprites(
             }
 
             // These items will be sorted by depth with other phase items
-            let sort_key = FloatOrd(extracted_sprite.transform.translation().z);
+            let distance = extracted_sprite.transform.translation().z;
 
             // Add the item to the render phase
-            transparent_phase.add(Transparent2d {
+            transparent_phase.add(Transparent3d {
                 draw_function: draw_sprite_function,
                 pipeline,
                 entity: (*entity, *main_entity),
-                sort_key,
+                distance,
                 // batch_range and dynamic_offset will be calculated in prepare_sprites
                 batch_range: 0..0,
                 extra_index: PhaseItemExtraIndex::NONE,
@@ -628,7 +628,7 @@ pub fn prepare_sprite_image_bind_groups(
     mut image_bind_groups: ResMut<ImageBindGroups>,
     gpu_images: Res<RenderAssets<GpuImage>>,
     extracted_sprites: Res<ExtractedSprites>,
-    mut phases: ResMut<ViewSortedRenderPhases<Transparent2d>>,
+    mut phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
     events: Res<SpriteAssetEvents>,
 ) {
     // If an image has changed, the GpuImage has (probably) changed
